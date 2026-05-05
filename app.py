@@ -21,7 +21,7 @@ if not API_TOKEN:
 # ============================================
 # 2. ВСТАВЬТЕ СЮДА ID АДМИНИСТРАТОРА
 # ============================================
-ADMIN_ID = 123456789  # ЗАМЕНИТЕ НА ВАШ TELEGRAM ID
+ADMIN_ID = 152676166  # ЗАМЕНИТЕ НА ВАШ TELEGRAM ID
 
 # ============================================
 # 3. ВСТАВЬТЕ СЮДА КОД ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ
@@ -110,7 +110,7 @@ async def run_bot():
 Баланс: {balance:.2f} руб."""
             await callback.message.answer(text)
         elif callback.data == "donate":
-            await callback.message.answer("💸 Ссылка на сбор: https://vtb.paymo.ru/collect-money/?transaction=c208d1eb-2b1a-47f8-9d41-835e1a005ee8")
+            await callback.message.answer("💸 Ссылка на сбор: https://vtb.paymo.ru/collect-money/?transaction=c208d1eb-2b1a-47f8-9d41-835e1a005ee8 Получатель: Наталья К.")
         await callback.answer()
     
     # ============================================
