@@ -101,11 +101,7 @@ async def show_finance(callback: types.CallbackQuery):
     collected = data['collected']
     spent = data['spent']
     balance = collected - spent
-    text = f"""ФИНАНСОВЫЙ ОТЧЕТ
-
-Собрано: {collected:.2f} руб.
-Потрачено: {spent:.2f} руб.
-Баланс: {balance:.2f} руб."""
+    text = f"💰 ФИНАНСОВЫЙ ОТЧЕТ\n\nСобрано: {collected:.2f} руб.\nПотрачено: {spent:.2f} руб.\nБаланс: {balance:.2f} руб."
     await callback.message.answer(text)
     await callback.answer()
 
