@@ -2,20 +2,15 @@
 import asyncio
 import os
 import json
-import aiogram
-print(f"✅ Aiogram version: {aiogram.__version__}")
 from threading import Thread
 from flask import Flask
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command, StateFilter
-from aiogram.fsm import State, StatesGroup
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram import Bot, Dispatcher, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters import Command, Text
+from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.client.default import DefaultBotProperties
 from tinydb import TinyDB, Query
-
-
 
 API_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 
@@ -23,20 +18,15 @@ if not API_TOKEN:
     raise ValueError("❌ Токен не найден!")
 
 # ID администратора (замените на свой Telegram ID)
-ADMIN_ID = 152676166  # 👈 ВСТАВЬТЕ СВОЙ ID
+ADMIN_ID = 123456789  # 👈 ВСТАВЬТЕ СВОЙ ID
 
 # --- База данных ---
 db = TinyDB('coffee_db.json')
 finances = db.table('finances')
-users = db.table('users')  # Храним всех, кто написал /start
+users = db.table('users')
 
 if not finances.all():
     finances.insert({'collected': 0.0, 'spent': 0.0})
-
-# Функции для финансов
-def get_balance():
-    data = finances.all()[0]
-    return data['collected'] - data['spent']
 
 def add_collected(amount):
     data = finances.all()[0]
@@ -48,7 +38,6 @@ def add_spent(amount, description):
     data['spent'] += amount
     finances.update(data, doc_ids=[1])
 
-# Функция для сохранения пользователя
 def save_user(user_id, username, first_name, last_name):
     User = Query()
     if not users.search(User.user_id == user_id):
@@ -58,9 +47,8 @@ def save_user(user_id, username, first_name, last_name):
             'first_name': first_name or "",
             'last_name': last_name or "",
         })
-        print(f"➕ Новый пользователь: {user_id} (@{username})")
 
-# --- Хранение пассивного объявления (видят при /start) ---
+# --- Хранение объявления ---
 ANNOUNCEMENT_FILE = 'announcement.json'
 
 def save_announcement(text):
@@ -79,7 +67,7 @@ def get_announcement():
 class FeedbackStates(StatesGroup):
     waiting_for_feedback = State()
 
-# --- Flask для Render (чтобы сервис не засыпал) ---
+# --- Flask для Render ---
 app_flask = Flask('')
 
 @app_flask.route('/')
@@ -92,34 +80,33 @@ def run_flask():
 
 # --- Клавиатуры ---
 def get_main_keyboard():
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📖 Где кофе и молоко?", callback_data="instruction")],
-        [InlineKeyboardButton(text="💰 Финансы", callback_data="finance")],
-        [InlineKeyboardButton(text="💸 Скинуться на кофе", callback_data="donate")],
-        [InlineKeyboardButton(text="📢 Объявления", callback_data="show_announcement")],
-        [InlineKeyboardButton(text="📝 Обратная связь", callback_data="feedback")]
-    ])
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        InlineKeyboardButton(text="📖 Где кофе и молоко?", callback_data="instruction"),
+        InlineKeyboardButton(text="💰 Финансы", callback_data="finance"),
+        InlineKeyboardButton(text="💸 Скинуться на кофе", callback_data="donate"),
+        InlineKeyboardButton(text="📢 Объявления", callback_data="show_announcement"),
+        InlineKeyboardButton(text="📝 Обратная связь", callback_data="feedback")
+    )
     return keyboard
 
 def get_admin_keyboard():
-    """Клавиатура для администратора при получении отзыва"""
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Отвечено", callback_data="feedback_answered")],
-        [InlineKeyboardButton(text="❌ Отклонить", callback_data="feedback_rejected")]
-    ])
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        InlineKeyboardButton(text="✅ Отвечено", callback_data="feedback_answered"),
+        InlineKeyboardButton(text="❌ Отклонить", callback_data="feedback_rejected")
+    )
     return keyboard
 
-# --- Основная функция с обработчиками ---
+# --- Основная функция ---
 async def run_bot():
+    bot = Bot(token=API_TOKEN, parse_mode="HTML")
     storage = MemoryStorage()
-    bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
-    dp = Dispatcher(storage=storage)
+    dp = Dispatcher(bot, storage=storage)
     
-    # ---------- ОБЫЧНЫЕ КОМАНДЫ ----------
-    
-    @dp.message(Command("start"))
+    # ---------- КОМАНДА START ----------
+    @dp.message_handler(Command("start"))
     async def cmd_start(message: types.Message):
-        # Сохраняем пользователя
         save_user(
             message.from_user.id,
             message.from_user.username,
@@ -127,7 +114,6 @@ async def run_bot():
             message.from_user.last_name
         )
         
-        # Показываем пассивное объявление (если есть)
         announcement = get_announcement()
         if announcement:
             welcome_text = f"""☕️ Добро пожаловать в Кофе-Бот!
@@ -142,17 +128,18 @@ async def run_bot():
         
         await message.answer(welcome_text, reply_markup=get_main_keyboard())
     
-    @dp.callback_query(F.data == "instruction")
+    # ---------- КНОПКИ МЕНЮ ----------
+    @dp.callback_query_handler(lambda c: c.data == "instruction")
     async def show_instruction(callback: types.CallbackQuery):
         text = """📍 ГДЕ НАЙТИ КОФЕ И МОЛОКО:
 
-☕️ Кофе: Коричневая жестяная банка в шкафу над кофеваркой, а еще выше пакеты с кофе, если в банке оно закончилось
-🥛 Молоко: Обычно в холодильнике в верхнем выдвижном ящике
-👤 Если кончилось то скоро купим :)"""
+☕️ Кофе: В верхнем ящике кухонного шкафа
+🥛 Молоко: В холодильнике (вторая полка)
+👤 Ответственный: Анна (каб. 405)"""
         await callback.message.answer(text)
         await callback.answer()
     
-    @dp.callback_query(F.data == "finance")
+    @dp.callback_query_handler(lambda c: c.data == "finance")
     async def show_finance(callback: types.CallbackQuery):
         data = finances.all()[0]
         collected = data['collected']
@@ -166,15 +153,14 @@ async def run_bot():
         await callback.message.answer(text)
         await callback.answer()
     
-    @dp.callback_query(F.data == "donate")
+    @dp.callback_query_handler(lambda c: c.data == "donate")
     async def show_donate(callback: types.CallbackQuery):
-        text = "💸 Ссылка на сбор: https://vtb.paymo.ru/collect-money/?transaction=c208d1eb-2b1a-47f8-9d41-835e1a005ee8"
+        text = "💸 Ссылка для оплаты: https://ваша-ссылка-на-оплату.com"
         await callback.message.answer(text)
         await callback.answer()
     
-    @dp.callback_query(F.data == "show_announcement")
+    @dp.callback_query_handler(lambda c: c.data == "show_announcement")
     async def show_announcement_button(callback: types.CallbackQuery):
-        """Показать текущее пассивное объявление"""
         announcement = get_announcement()
         if announcement:
             text = f"📢 <b>ТЕКУЩЕЕ ОБЪЯВЛЕНИЕ:</b>\n\n{announcement}"
@@ -184,28 +170,22 @@ async def run_bot():
         await callback.answer()
     
     # ---------- ОБРАТНАЯ СВЯЗЬ ----------
-    
-    @dp.callback_query(F.data == "feedback")
-    async def start_feedback(callback: types.CallbackQuery, state: FSMContext):
+    @dp.callback_query_handler(lambda c: c.data == "feedback")
+    async def start_feedback(callback: types.CallbackQuery):
         await callback.message.answer(
             "📝 <b>Напишите ваш отзыв, пожелание или сообщите о проблеме.</b>\n\n"
-            "Просто отправьте текстовое сообщение. Если передумали — отправьте /cancel",
+            "Просто отправьте текстовое сообщение. Если передумали — отправьте /cancel"
         )
-        await state.set_state(FeedbackStates.waiting_for_feedback)
+        await FeedbackStates.waiting_for_feedback.set()
         await callback.answer()
     
-    @dp.message(Command("cancel"))
+    @dp.message_handler(Command("cancel"), state="*")
     async def cancel_feedback(message: types.Message, state: FSMContext):
-        current_state = await state.get_state()
-        if current_state is None:
-            await message.answer("❌ Нет активного действия для отмены")
-            return
-        await state.clear()
+        await state.finish()
         await message.answer("✅ Действие отменено.", reply_markup=get_main_keyboard())
     
-    @dp.message(StateFilter(FeedbackStates.waiting_for_feedback), F.text)
+    @dp.message_handler(state=FeedbackStates.waiting_for_feedback, content_types=types.ContentTypes.TEXT)
     async def process_feedback(message: types.Message, state: FSMContext):
-        # Сохраняем пользователя (на случай, если его ещё нет)
         save_user(
             message.from_user.id,
             message.from_user.username,
@@ -234,32 +214,23 @@ async def run_bot():
                 "Возвращаемся в главное меню:",
                 reply_markup=get_main_keyboard()
             )
-            await state.clear()
+            await state.finish()
         except Exception as e:
             await message.answer("❌ Ошибка при отправке отзыва. Попробуйте позже.")
-            print(f"Ошибка: {e}")
-            await state.clear()
+            await state.finish()
     
-    @dp.message(StateFilter(FeedbackStates.waiting_for_feedback))
-    async def feedback_invalid_input(message: types.Message, state: FSMContext):
-        await message.answer(
-            "📝 Пожалуйста, отправьте <b>текстовое сообщение</b>.\n"
-            "Если хотите отменить — отправьте /cancel"
-        )
-    
-    @dp.callback_query(F.data == "feedback_answered")
+    @dp.callback_query_handler(lambda c: c.data == "feedback_answered")
     async def feedback_answered(callback: types.CallbackQuery):
         await callback.message.edit_text(callback.message.text + "\n\n✅ <b>Статус:</b> Обработано")
-        await callback.answer("Отмечено как отвеченное")
+        await callback.answer()
     
-    @dp.callback_query(F.data == "feedback_rejected")
+    @dp.callback_query_handler(lambda c: c.data == "feedback_rejected")
     async def feedback_rejected(callback: types.CallbackQuery):
         await callback.message.edit_text(callback.message.text + "\n\n❌ <b>Статус:</b> Отклонено")
-        await callback.answer("Отзыв отклонен")
+        await callback.answer()
     
     # ---------- КОМАНДЫ АДМИНИСТРАТОРА ----------
-    
-    @dp.message(Command("add"))
+    @dp.message_handler(Command("add"))
     async def cmd_add_money(message: types.Message):
         if message.from_user.id != ADMIN_ID:
             await message.answer("⛔️ У вас нет прав")
@@ -271,7 +242,7 @@ async def run_bot():
         except (IndexError, ValueError):
             await message.answer("❌ Использование: /add [сумма]\nПример: /add 500")
     
-    @dp.message(Command("spend"))
+    @dp.message_handler(Command("spend"))
     async def cmd_spend_money(message: types.Message):
         if message.from_user.id != ADMIN_ID:
             await message.answer("⛔️ У вас нет прав")
@@ -285,7 +256,7 @@ async def run_bot():
         except (IndexError, ValueError):
             await message.answer("❌ Использование: /spend [сумма] [описание]\nПример: /spend 500 купили кофе")
     
-    @dp.message(Command("stats"))
+    @dp.message_handler(Command("stats"))
     async def cmd_stats(message: types.Message):
         if message.from_user.id != ADMIN_ID:
             await message.answer("⛔️ У вас нет прав")
@@ -298,9 +269,8 @@ async def run_bot():
 📈 Текущий баланс: {data['collected'] - data['spent']:.2f} руб."""
         await message.answer(text)
     
-    @dp.message(Command("users"))
+    @dp.message_handler(Command("users"))
     async def cmd_users_stats(message: types.Message):
-        """Показать статистику пользователей"""
         if message.from_user.id != ADMIN_ID:
             await message.answer("⛔️ У вас нет прав")
             return
@@ -308,51 +278,38 @@ async def run_bot():
         if not all_users:
             await message.answer("📊 Нет пользователей в базе")
             return
-        text = f"👥 <b>СТАТИСТИКА ПОЛЬЗОВАТЕЛЕЙ</b>\n\n📊 Всего: {len(all_users)}\n\n📋 <b>Список (последние 10):</b>\n"
-        for i, user in enumerate(all_users[-10:], 1):
-            name = user.get('first_name', 'Без имени')
-            username = f"@{user['username']}" if user.get('username') else "нет username"
-            text += f"{i}. {name} {username} (ID: {user['user_id']})\n"
+        text = f"👥 <b>СТАТИСТИКА ПОЛЬЗОВАТЕЛЕЙ</b>\n\n📊 Всего: {len(all_users)}\n"
         await message.answer(text)
     
-    # --- ПАССИВНОЕ ОБЪЯВЛЕНИЕ (видят при /start) ---
-    @dp.message(Command("announce"))
+    @dp.message_handler(Command("announce"))
     async def cmd_announce(message: types.Message):
-        """Установить объявление (видно при /start)"""
         if message.from_user.id != ADMIN_ID:
             await message.answer("⛔️ У вас нет прав")
             return
         try:
             text = message.text.split(maxsplit=1)[1]
             save_announcement(text)
-            await message.answer(f"✅ Пассивное объявление сохранено!\n\nТеперь все увидят его при команде /start:\n\n{text}")
+            await message.answer(f"✅ Объявление сохранено!\n\n{text}")
         except IndexError:
-            await message.answer("❌ Использование: /announce [текст]\n\nПример: /announce Завтра кофе не завезут")
+            await message.answer("❌ Использование: /announce [текст]")
     
-    @dp.message(Command("clear_announce"))
+    @dp.message_handler(Command("clear_announce"))
     async def cmd_clear_announce(message: types.Message):
-        """Очистить пассивное объявление"""
         if message.from_user.id != ADMIN_ID:
             await message.answer("⛔️ У вас нет прав")
             return
         save_announcement("")
-        await message.answer("✅ Пассивное объявление удалено")
+        await message.answer("✅ Объявление удалено")
     
-    # --- АКТИВНАЯ РАССЫЛКА (отправляет сообщение всем пользователям) ---
-    @dp.message(Command("broadcast"))
+    @dp.message_handler(Command("broadcast"))
     async def cmd_broadcast(message: types.Message):
-        """Отправить сообщение ВСЕМ пользователям (активная рассылка)"""
         if message.from_user.id != ADMIN_ID:
             await message.answer("⛔️ У вас нет прав")
             return
-        
         try:
             broadcast_text = message.text.split(maxsplit=1)[1]
         except IndexError:
-            await message.answer(
-                "❌ Использование: /broadcast [текст]\n\n"
-                "Пример: /broadcast Всем сотрудникам! Завтра кофе не завезут."
-            )
+            await message.answer("❌ Использование: /broadcast [текст]")
             return
         
         all_users = users.all()
@@ -366,29 +323,25 @@ async def run_bot():
         fail_count = 0
         
         for user in all_users:
-            user_id = user['user_id']
             try:
                 await bot.send_message(
-                    user_id,
-                    f"📢 <b>Сообщение от администратора:</b>\n\n{broadcast_text}",
-                    parse_mode="HTML"
+                    user['user_id'],
+                    f"📢 <b>Сообщение от администратора:</b>\n\n{broadcast_text}"
                 )
                 success_count += 1
-            except Exception:
+            except:
                 fail_count += 1
             await asyncio.sleep(0.05)
         
         await status_msg.edit_text(
             f"✅ <b>Рассылка завершена!</b>\n\n"
             f"📨 Отправлено: {success_count}\n"
-            f"❌ Не доставлено: {fail_count}\n"
-            f"👥 Всего в базе: {len(all_users)}",
-            parse_mode="HTML"
+            f"❌ Не доставлено: {fail_count}"
         )
     
     # --- ЗАПУСК ---
     print("🤖 Кофе-бот запущен!")
-    await dp.start_polling(bot)
+    await dp.start_polling()
 
 if __name__ == "__main__":
     thread = Thread(target=run_flask)
