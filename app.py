@@ -10,6 +10,13 @@ from aiogram.client.default import DefaultBotProperties
 from tinydb import TinyDB, Query
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
+from aiogram.fsm import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
+
+# --- Состояния для обратной связи ---
+class FeedbackStates(StatesGroup):
+    waiting_for_feedback = State()
 
 API_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 
@@ -62,7 +69,15 @@ def get_main_keyboard():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📖 Где кофе и молоко?", callback_data="instruction")],
         [InlineKeyboardButton(text="💰 Финансы", callback_data="finance")],
-        [InlineKeyboardButton(text="💸 Скинуться на кофе", callback_data="donate")]
+        [InlineKeyboardButton(text="💸 Скинуться на кофе", callback_data="donate")],
+        [InlineKeyboardButton(text="📝 Обратная связь", callback_data="feedback")]  # НОВАЯ КНОПКА
+    ])
+    return keyboard
+
+def get_admin_keyboard():
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Отвечено", callback_data="feedback_answered")],
+        [InlineKeyboardButton(text="❌ Отклонить", callback_data="feedback_rejected")]
     ])
     return keyboard
 
@@ -167,11 +182,94 @@ async def cmd_clear_announce(message: types.Message):
     save_announcement("")
     await message.answer("✅ Объявление удалено")
 
+# --- ОБРАТНАЯ СВЯЗЬ ---
+
+@dp.callback_query(lambda c: c.data == "feedback")
+async def start_feedback(callback: types.CallbackQuery, state: FSMContext):
+    """Начинаем процесс обратной связи"""
+    await callback.message.answer(
+        "📝 Напишите ваш отзыв, пожелание или сообщите о проблеме.\n\n"
+        "Просто отправьте текстовое сообщение. Если передумали — отправьте /cancel"
+    )
+    await state.set_state(FeedbackStates.waiting_for_feedback)
+    await callback.answer()
+
+@dp.message(Command("cancel"))
+async def cancel_feedback(message: types.Message, state: FSMContext):
+    """Отмена обратной связи"""
+    current_state = await state.get_state()
+    if current_state is None:
+        await message.answer("Нет активного действия для отмены")
+        return
+    
+    await state.clear()
+    await message.answer("✅ Действие отменено.", reply_markup=get_main_keyboard())
+
+@dp.message(FeedbackStates.waiting_for_feedback)
+async def process_feedback(message: types.Message, state: FSMContext):
+    """Обрабатываем полученный отзыв"""
+    feedback_text = message.text
+    user_id = message.from_user.id
+    username = message.from_user.username or "без username"
+    first_name = message.from_user.first_name or ""
+    last_name = message.from_user.last_name or ""
+    full_name = f"{first_name} {last_name}".strip()
+    
+    # Формируем сообщение для администратора
+    admin_message = f"""📝 НОВЫЙ ОТЗЫВ
+
+Отправитель: {full_name}
+User ID: {user_id}
+Username: @{username}
+
+Сообщение:
+{feedback_text}"""
+    
+    try:
+        # Отправляем администратору
+        await bot.send_message(ADMIN_ID, admin_message, reply_markup=get_admin_keyboard())
+        
+        # Подтверждаем пользователю
+        await message.answer(
+            "✅ Спасибо за ваш отзыв! Он отправлен администратору.\n\n"
+            "Возвращаемся в главное меню:",
+            reply_markup=get_main_keyboard()
+        )
+        await state.clear()
+        
+    except Exception as e:
+        await message.answer(
+            "❌ Произошла ошибка при отправке отзыва. Пожалуйста, попробуйте позже."
+        )
+        print(f"Ошибка отправки отзыва: {e}")
+        await state.clear()
+
+@dp.callback_query(lambda c: c.data == "feedback_answered")
+async def feedback_answered(callback: types.CallbackQuery):
+    """Администратор отметил, что ответил на отзыв"""
+    await callback.message.edit_text(
+        callback.message.text + "\n\n✅ Статус: Обработано"
+    )
+    await callback.answer("Отмечено как отвеченное")
+
+@dp.callback_query(lambda c: c.data == "feedback_rejected")
+async def feedback_rejected(callback: types.CallbackQuery):
+    """Администратор отклонил отзыв"""
+    await callback.message.edit_text(
+        callback.message.text + "\n\n❌ Статус: Отклонено"
+    )
+    await callback.answer("Отзыв отклонен")
+
 # --- Запуск бота через polling (не webhook) ---
-async def start_bot():
+async def start_bot():  # <-- ЭТО ВМЕСТО run_bot()
     await bot.delete_webhook(drop_pending_updates=True)
     print("🤖 Кофе-бот запущен!")
     await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    thread = Thread(target=run_flask)
+    thread.start()
+    asyncio.run(start_bot())  # <-- ЗДЕСЬ ВЫЗЫВАЕТСЯ start_bot()
 
 # --- Точка входа для Render ---
 # Запускаем Flask в отдельном потоке, а бота в основном
