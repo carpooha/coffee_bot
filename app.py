@@ -74,6 +74,9 @@ async def run_bot():
     bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
     dp = Dispatcher()
     
+    # Сбрасываем webhook (важно для работы polling на Render)
+    await bot.delete_webhook(drop_pending_updates=True)
+    
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
         announcement = get_announcement()
@@ -82,6 +85,18 @@ async def run_bot():
 
 📢 <b>ОБЪЯВЛЕНИЕ:</b>
 {announcement}
+
+---
+Выберите действие:"""
+        else:
+            welcome_text = "☕️ Добро пожаловать в Кофе-Бот!\n\nВыберите действие:"
+        
+        await message.answer(welcome_text, reply_markup=get_main_keyboard())
+    
+    # ... остальные обработчики ...
+    
+    print("🤖 Кофе-бот запущен!")
+    await dp.start_polling(bot)
 
 ---
 Выберите действие:"""
