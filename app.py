@@ -16,7 +16,7 @@ API_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 if not API_TOKEN:
     raise ValueError("❌ Токен не найден!")
 
-ADMIN_ID = 123456789  # 👈 ВСТАВЬТЕ СВОЙ ID
+ADMIN_ID = 152676166  # 👈 ВСТАВЬТЕ СВОЙ ID
 
 # --- База данных ---
 db = TinyDB('coffee_db.json')
@@ -90,9 +90,9 @@ async def cmd_start(message: types.Message):
 async def show_instruction(callback: types.CallbackQuery):
     text = """📍 ГДЕ НАЙТИ КОФЕ И МОЛОКО:
 
-☕️ Кофе: В верхнем ящике кухонного шкафа
-🥛 Молоко: В холодильнике (вторая полка)
-👤 Ответственный: Анна (каб. 405)"""
+☕️ Кофе: В шкафу над кофемашиной в жестяной коричневой банке. Пакет с кофе еще выше, если в банка кончилось
+🥛 Молоко: В холодильнике в верхнем выдвижном ящике, или в дверке открытое
+👤 Если кончилось - купим еще :)
     await callback.message.answer(text)
     await callback.answer()
 
@@ -112,7 +112,7 @@ async def show_finance(callback: types.CallbackQuery):
 
 @dp.callback_query(lambda c: c.data == "donate")
 async def show_donate(callback: types.CallbackQuery):
-    text = "💸 Ссылка для оплаты: https://ваша-ссылка-на-оплату.com"
+    text = "💸 Ссылка на сбор: https://vtb.paymo.ru/collect-money/?transaction=c208d1eb-2b1a-47f8-9d41-835e1a005ee8"
     await callback.message.answer(text)
     await callback.answer()
 
