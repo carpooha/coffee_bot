@@ -60,7 +60,7 @@ def run_flask():
     port = int(os.environ.get('PORT', 8080))
     app_flask.run(host='0.0.0.0', port=port)
 
-# --- Клавиатура ---
+# --- Клавиатура с эмодзи ---
 def get_main_keyboard():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📖 Где кофе и молоко?", callback_data="instruction")],
@@ -74,7 +74,7 @@ async def run_bot():
     bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
     dp = Dispatcher()
     
-    # Сбрасываем webhook (важно для работы polling на Render)
+    # Сбрасываем webhook
     await bot.delete_webhook(drop_pending_updates=True)
     
     @dp.message(Command("start"))
@@ -93,20 +93,9 @@ async def run_bot():
         
         await message.answer(welcome_text, reply_markup=get_main_keyboard())
     
-    # ... остальные обработчики ...
-    
-    print("🤖 Кофе-бот запущен!")
-    await dp.start_polling(bot)
-
----
-Выберите действие:"""
-        else:
-            welcome_text = "☕️ Добро пожаловать в Кофе-Бот!\n\nВыберите действие:"
-        await message.answer(welcome_text, reply_markup=get_main_keyboard())
-    
     @dp.callback_query(lambda c: c.data == "instruction")
     async def show_instruction(callback: types.CallbackQuery):
-        text = """ГДЕ НАЙТИ КОФЕ И МОЛОКО:
+        text = """📍 ГДЕ НАЙТИ КОФЕ И МОЛОКО:
 
 ☕️ Кофе: В верхнем ящике кухонного шкафа
 🥛 Молоко: В холодильнике (вторая полка)
