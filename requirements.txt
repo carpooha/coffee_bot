@@ -1,6 +1,5 @@
 ﻿aiogram==3.12.0
-aiohttp[speedups]
-flask
-gunicorn
-tinydb
-typing_extensions
+aiohttp==3.10.10
+flask==3.0.3
+gunicorn==22.0.0
+tinydb==4.8.0

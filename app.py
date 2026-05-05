@@ -2,6 +2,8 @@
 import asyncio
 import os
 import json
+import aiogram
+print(f"✅ Aiogram version: {aiogram.__version__}")
 from threading import Thread
 from flask import Flask
 from aiogram import Bot, Dispatcher, types, F
@@ -12,6 +14,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 from tinydb import TinyDB, Query
+
+
 
 API_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 
