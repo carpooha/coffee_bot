@@ -146,9 +146,9 @@ async def cmd_stats(message: types.Message):
     data = finances.all()[0]
     text = f"""СТАТИСТИКА
 
-💰 Собрано: {data['collected']:.2f} руб.
-💸 Потрачено: {data['spent']:.2f} руб.
-📈 Баланс: {data['collected'] - data['spent']:.2f} руб."""
+Собрано: {data['collected']:.2f} руб.
+Потрачено: {data['spent']:.2f} руб.
+Баланс: {data['collected'] - data['spent']:.2f} руб."""
     await message.answer(text)
 
 @dp.message(Command("announce"))
