@@ -1,7 +1,5 @@
 ﻿aiogram==3.12.0
 aiohttp
-certifi
 flask
 gunicorn
 tinydb
-asyncio
