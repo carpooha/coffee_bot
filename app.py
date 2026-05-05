@@ -101,7 +101,7 @@ async def show_finance(callback: types.CallbackQuery):
     collected = data['collected']
     spent = data['spent']
     balance = collected - spent
-    text = f"""💰 ФИНАНСОВЫЙ ОТЧЕТ
+    text = f"""ФИНАНСОВЫЙ ОТЧЕТ
 
 Собрано: {collected:.2f} руб.
 Потрачено: {spent:.2f} руб.
