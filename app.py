@@ -106,7 +106,7 @@ async def run_bot():
     
     @dp.callback_query(lambda c: c.data == "instruction")
     async def show_instruction(callback: types.CallbackQuery):
-        text = """📍 ГДЕ НАЙТИ КОФЕ И МОЛОКО:
+        text = """ГДЕ НАЙТИ КОФЕ И МОЛОКО:
 
 ☕️ Кофе: В верхнем ящике кухонного шкафа
 🥛 Молоко: В холодильнике (вторая полка)
