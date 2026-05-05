@@ -141,14 +141,10 @@ async def cmd_spend_money(message: types.Message):
 @dp.message(Command("stats"))
 async def cmd_stats(message: types.Message):
     if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔️ У вас нет прав")
+        await message.answer("No permission")
         return
     data = finances.all()[0]
-    text = f"""СТАТИСТИКА
-
-Собрано: {data['collected']:.2f} руб.
-Потрачено: {data['spent']:.2f} руб.
-Баланс: {data['collected'] - data['spent']:.2f} руб."""
+    text = f"STATISTICS\n\nCollected: {data['collected']} rub.\nSpent: {data['spent']} rub.\nBalance: {data['collected'] - data['spent']} rub."
     await message.answer(text)
 
 @dp.message(Command("announce"))
