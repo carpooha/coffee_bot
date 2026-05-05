@@ -144,7 +144,7 @@ async def cmd_stats(message: types.Message):
         await message.answer("⛔️ У вас нет прав")
         return
     data = finances.all()[0]
-    text = f"""📊 СТАТИСТИКА
+    text = f"""СТАТИСТИКА
 
 💰 Собрано: {data['collected']:.2f} руб.
 💸 Потрачено: {data['spent']:.2f} руб.
