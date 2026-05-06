@@ -21,6 +21,7 @@ ADMIN_ID = 152676166  # ЗАМЕНИТЕ НА СВОЙ ID
 # --- База данных ---
 db = TinyDB('coffee_db.json')
 finances = db.table('finances')
+users = db.table('users')  # новая таблица для пользателей и рассылки
 feedbacks = db.table('feedbacks')  # Новая таблица для отзывов
 
 if not finances.all():
@@ -35,6 +36,17 @@ def add_spent(amount, description):
     data = finances.all()[0]
     data['spent'] += amount
     finances.update(data, doc_ids=[1])
+
+# --- функция сохранения пользователей ---
+def save_user(user_id, username, first_name, last_name):
+    User = Query()
+    if not users.search(User.user_id == user_id):
+        users.insert({
+            'user_id': user_id,
+            'username': username or "",
+            'first_name': first_name or "",
+            'last_name': last_name or "",
+        })
 
 # --- Функции для отзывов ---
 def save_feedback(user_id, username, full_name, text):
@@ -104,12 +116,26 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    announcement = get_announcement()
+    save_user(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.first_name,
+        message.from_user.last_name
+    ) # --- сохраняем пользователя ---
+announcement = get_announcement()
     if announcement:
         welcome_text = f"☕️ Добро пожаловать в Кофе-Бот!\n\n📢 ОБЪЯВЛЕНИЕ:\n{announcement}\n\n---\nВыберите действие:"
     else:
         welcome_text = "☕️ Добро пожаловать в Кофе-Бот!\n\nВыберите действие:"
     await message.answer(welcome_text, reply_markup=get_main_keyboard())
+
+@dp.message(Command("users")) # --- считаем пользователей ---
+async def cmd_users(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("Нет прав")
+        return
+    count = len(users.all())
+    await message.answer(f"👥 Пользователей в базе: {count}")
 
 @dp.callback_query(lambda c: c.data == "instruction")
 async def show_instruction(callback: types.CallbackQuery):
