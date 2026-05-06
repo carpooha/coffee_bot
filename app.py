@@ -133,57 +133,7 @@ async def show_donate(callback: types.CallbackQuery):
     await callback.message.answer(text)
     await callback.answer()
 
-# --- ОБРАТНАЯ СВЯЗЬ (упрощённая) ---
-@dp.callback_query(lambda c: c.data == "feedback")
-async def start_feedback(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    waiting_for_feedback[user_id] = True
-    await callback.message.answer(
-        "📝 Напишите ваш отзыв или предложение.\n\n"
-        "Просто отправьте текстовое сообщение. Чтобы отменить — отправьте /cancel"
-    )
-    await callback.answer()
 
-@dp.message(Command("cancel"))
-async def cancel_feedback(message: types.Message):
-    user_id = message.from_user.id
-    if user_id in waiting_for_feedback:
-        del waiting_for_feedback[user_id]
-        await message.answer("✅ Отправка отзыва отменена.", reply_markup=get_main_keyboard())
-    else:
-        await message.answer("Нет активного действия для отмены")
-
-@dp.message()
-async def handle_feedback_text(message: types.Message):
-    user_id = message.from_user.id
-    
-    # Проверяем, ожидает ли пользователь отправки отзыва
-    if user_id not in waiting_for_feedback:
-        return  # игнорируем сообщения не в режиме обратной связи
-    
-    # Убираем пользователя из ожидания
-    del waiting_for_feedback[user_id]
-    
-    # Сохраняем отзыв
-    username = message.from_user.username or "без username"
-    full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
-    feedback_text = message.text
-    
-    save_feedback(user_id, username, full_name, feedback_text)
-    
-    # Отправляем подтверждение пользователю
-    await message.answer(
-        "✅ Спасибо за ваш отзыв! Он сохранён и будет рассмотрен администратором.\n\n"
-        "Возвращаемся в главное меню:",
-        reply_markup=get_main_keyboard()
-    )
-    
-    # Отправляем уведомление администратору
-    try:
-        admin_message = f"📝 НОВЫЙ ОТЗЫВ\n\nОтправитель: {full_name}\nUsername: @{username}\n\nСообщение:\n{feedback_text}"
-        await bot.send_message(ADMIN_ID, admin_message)
-    except:
-        pass  # Если не отправилось — не страшно, отзыв сохранён в БД
 
 # --- КОМАНДА ДЛЯ ПРОСМОТРА ОТЗЫВОВ (админ) ---
 @dp.message(Command("feedbacks"))
@@ -262,6 +212,58 @@ async def cmd_clear_announce(message: types.Message):
         return
     save_announcement("")
     await message.answer("✅ Объявление удалено")
+
+# --- ОБРАТНАЯ СВЯЗЬ (упрощённая) ---
+@dp.callback_query(lambda c: c.data == "feedback")
+async def start_feedback(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    waiting_for_feedback[user_id] = True
+    await callback.message.answer(
+        "📝 Напишите ваш отзыв или предложение.\n\n"
+        "Просто отправьте текстовое сообщение. Чтобы отменить — отправьте /cancel"
+    )
+    await callback.answer()
+
+@dp.message(Command("cancel"))
+async def cancel_feedback(message: types.Message):
+    user_id = message.from_user.id
+    if user_id in waiting_for_feedback:
+        del waiting_for_feedback[user_id]
+        await message.answer("✅ Отправка отзыва отменена.", reply_markup=get_main_keyboard())
+    else:
+        await message.answer("Нет активного действия для отмены")
+
+@dp.message()
+async def handle_feedback_text(message: types.Message):
+    user_id = message.from_user.id
+    
+    # Проверяем, ожидает ли пользователь отправки отзыва
+    if user_id not in waiting_for_feedback:
+        return  # игнорируем сообщения не в режиме обратной связи
+    
+    # Убираем пользователя из ожидания
+    del waiting_for_feedback[user_id]
+    
+    # Сохраняем отзыв
+    username = message.from_user.username or "без username"
+    full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+    feedback_text = message.text
+    
+    save_feedback(user_id, username, full_name, feedback_text)
+    
+    # Отправляем подтверждение пользователю
+    await message.answer(
+        "✅ Спасибо за ваш отзыв! Он сохранён и будет рассмотрен администратором.\n\n"
+        "Возвращаемся в главное меню:",
+        reply_markup=get_main_keyboard()
+    )
+    
+    # Отправляем уведомление администратору
+    try:
+        admin_message = f"📝 НОВЫЙ ОТЗЫВ\n\nОтправитель: {full_name}\nUsername: @{username}\n\nСообщение:\n{feedback_text}"
+        await bot.send_message(ADMIN_ID, admin_message)
+    except:
+        pass  # Если не отправилось — не страшно, отзыв сохранён в БД
 
 # --- Запуск ---
 async def start_bot():
