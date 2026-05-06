@@ -122,7 +122,9 @@ async def cmd_start(message: types.Message):
         message.from_user.first_name,
         message.from_user.last_name
     ) # --- сохраняем пользователя ---
-announcement = get_announcement()
+    announcement = get_announcement()
+    
+    # Формируем приветствие
     if announcement:
         welcome_text = f"☕️ Добро пожаловать в Кофе-Бот!\n\n📢 ОБЪЯВЛЕНИЕ:\n{announcement}\n\n---\nВыберите действие:"
     else:
